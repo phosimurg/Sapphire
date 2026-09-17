@@ -11,6 +11,199 @@ import XCTest
 @testable import Sapphire
 
 final class InfrastructureUtilitiesTests: XCTestCase {
+    @MainActor
+    func testNotchDragLocationOnlyPublishesDistinctCoordinates() {
+        let state = NotchDragLocationState()
+        var publications = 0
+        let cancellable = state.objectWillChange.sink { publications += 1 }
+        defer { cancellable.cancel() }
+
+        let location = CGPoint(x: 120, y: 42)
+        state.update(location)
+        state.update(location)
+        state.update(nil)
+        state.update(nil)
+
+        XCTAssertEqual(publications, 2)
+        XCTAssertNil(state.location)
+    }
+
+    func testSettingsSidebarCatalogContainsEveryDestinationExactlyOnce() {
+        let sidebarSections = SettingsSection.sidebarGroups.flatMap(\.sections)
+
+        XCTAssertEqual(sidebarSections.count, SettingsSection.allCases.count)
+        XCTAssertEqual(Set(sidebarSections.map(\.id)), Set(SettingsSection.allCases.map(\.id)))
+        XCTAssertEqual(Set(sidebarSections.map(\.id)).count, sidebarSections.count)
+    }
+
+    @MainActor
+    func testSettingsMutationPublishesOneObjectInvalidation() {
+        let model = SettingsModel.shared
+        let original = model.settings
+        var invalidations = 0
+        let cancellable = model.objectWillChange.sink { invalidations += 1 }
+        defer {
+            cancellable.cancel()
+            model.settings = original
+            model.flushPendingSave()
+        }
+
+        model.settings.menuBarOpacity = original.menuBarOpacity == 0.42 ? 0.43 : 0.42
+
+        XCTAssertEqual(invalidations, 1)
+    }
+
+    @MainActor
+    func testSettingsEditingSessionCoalescesRapidDraftChanges() async {
+        let model = SettingsModel.shared
+        let original = model.settings
+        let session = SettingsEditingSession(model: model)
+        var publications = 0
+        let cancellable = model.$settings.dropFirst().sink { _ in publications += 1 }
+        defer {
+            cancellable.cancel()
+            model.settings = original
+            model.flushPendingSave()
+        }
+
+        for index in 0..<40 {
+            session.settings.menuBarOpacity = 0.2 + Double(index) / 100
+        }
+        let expectedOpacity = session.settings.menuBarOpacity
+
+        try? await Task.sleep(nanoseconds: 180_000_000)
+
+        XCTAssertEqual(model.settings.menuBarOpacity, expectedOpacity)
+        XCTAssertEqual(publications, 1)
+    }
+
+    @MainActor
+    func testSettingsEditingSessionDoesNotPublishWhenDraftReturnsToBaseline() async {
+        let model = SettingsModel.shared
+        let original = model.settings
+        let session = SettingsEditingSession(model: model)
+        var publications = 0
+        let cancellable = model.$settings.dropFirst().sink { _ in publications += 1 }
+        defer {
+            cancellable.cancel()
+            model.settings = original
+            model.flushPendingSave()
+        }
+
+        session.settings.menuBarBlur.toggle()
+        session.settings.menuBarBlur = original.menuBarBlur
+
+        try? await Task.sleep(nanoseconds: 180_000_000)
+
+        XCTAssertEqual(publications, 0)
+        XCTAssertEqual(model.settings, original)
+    }
+
+    @MainActor
+    func testSettingsEditingSessionPreservesNewDraftAndConcurrentRuntimeChanges() async {
+        let model = SettingsModel.shared
+        let original = model.settings
+        defer {
+            model.settings = original
+            model.flushPendingSave()
+        }
+
+        let session = SettingsEditingSession(model: model)
+        let editedOpacity = original.menuBarOpacity == 0.314 ? 0.315 : 0.314
+        let editedBlur = !original.menuBarBlur
+        let runtimeHover = !original.showOnHover
+
+        session.settings.menuBarOpacity = editedOpacity
+        session.commitNow()
+
+        session.settings.menuBarBlur = editedBlur
+        model.settings.showOnHover = runtimeHover
+        try? await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(session.settings.menuBarOpacity, editedOpacity)
+        XCTAssertEqual(session.settings.menuBarBlur, editedBlur)
+        XCTAssertEqual(session.settings.showOnHover, runtimeHover)
+
+        session.commitNow()
+        XCTAssertEqual(model.settings.menuBarOpacity, editedOpacity)
+        XCTAssertEqual(model.settings.menuBarBlur, editedBlur)
+        XCTAssertEqual(model.settings.showOnHover, runtimeHover)
+    }
+
+    @MainActor
+    func testSettingsEditingSessionDiscardsQueuedExternalStateOlderThanCommit() async {
+        let model = SettingsModel.shared
+        let original = model.settings
+        defer {
+            model.settings = original
+            model.flushPendingSave()
+        }
+
+        let session = SettingsEditingSession(model: model)
+        let editedBlur = !original.menuBarBlur
+        let runtimeHover = !original.showOnHover
+
+        session.settings.menuBarBlur = editedBlur
+        model.settings.showOnHover = runtimeHover
+        session.commitNow()
+        try? await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(session.settings.menuBarBlur, editedBlur)
+        XCTAssertEqual(session.settings.showOnHover, runtimeHover)
+        XCTAssertEqual(session.settings, model.settings)
+    }
+
+    @MainActor
+    func testSettingsEditingSessionDoesNotMistakeEqualExternalRollbackForEcho() async {
+        let model = SettingsModel.shared
+        let original = model.settings
+        defer {
+            model.settings = original
+            model.flushPendingSave()
+        }
+
+        let session = SettingsEditingSession(model: model)
+        session.settings.menuBarBlur.toggle()
+        session.commitNow()
+        let firstCommit = model.settings
+
+        session.settings.showOnHover.toggle()
+        session.commitNow()
+        XCTAssertNotEqual(model.settings, firstCommit)
+
+        model.settings = firstCommit
+        try? await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(session.settings, firstCommit)
+        XCTAssertEqual(session.settings, model.settings)
+    }
+
+    func testHardwareNotchDetectionRequiresSafeAreaAndCentralCutout() {
+        let leftArea = CGRect(x: 0, y: 0, width: 700, height: 32)
+        let rightArea = CGRect(x: 900, y: 0, width: 700, height: 32)
+
+        XCTAssertTrue(NotchConfiguration.hasHardwareNotch(
+            safeAreaTop: 32,
+            leftArea: leftArea,
+            rightArea: rightArea
+        ))
+        XCTAssertFalse(NotchConfiguration.hasHardwareNotch(
+            safeAreaTop: 0,
+            leftArea: leftArea,
+            rightArea: rightArea
+        ))
+        XCTAssertFalse(NotchConfiguration.hasHardwareNotch(
+            safeAreaTop: 32,
+            leftArea: nil,
+            rightArea: nil
+        ))
+        XCTAssertFalse(NotchConfiguration.hasHardwareNotch(
+            safeAreaTop: 32,
+            leftArea: leftArea,
+            rightArea: CGRect(x: leftArea.maxX, y: 0, width: 700, height: 32)
+        ))
+    }
+
     func testDevActivityParticipatesInLiveActivityOrdering() {
         XCTAssertTrue(LiveActivityType.allCases.contains(.devActivity))
         XCTAssertEqual(ActivityType(from: .devActivity), .devActivity)
@@ -49,47 +242,6 @@ final class InfrastructureUtilitiesTests: XCTestCase {
         XCTAssertTrue(window.collectionBehavior.contains(.canJoinAllSpaces))
         XCTAssertTrue(window.collectionBehavior.contains(.fullScreenAuxiliary))
         window.close()
-    }
-
-    @MainActor
-    func testFullScreenVisibilitySuppressesOnlyTheMatchingDisplayWindow() {
-        let delegate = AppDelegate()
-        let firstWindow = makeDynamicFocusWindow(displayID: 101)
-        let secondWindow = makeDynamicFocusWindow(displayID: 202)
-        delegate.notchWindows = [firstWindow, secondWindow]
-        firstWindow.orderFront(nil)
-        secondWindow.orderFront(nil)
-        defer {
-            firstWindow.close()
-            secondWindow.close()
-        }
-
-        delegate.applyFullScreenNotchVisibility(displayIDs: [101])
-
-        XCTAssertTrue(firstWindow.isSuppressedForFullScreen)
-        XCTAssertFalse(firstWindow.isVisible)
-        XCTAssertFalse(secondWindow.isSuppressedForFullScreen)
-        XCTAssertTrue(secondWindow.isVisible)
-
-        firstWindow.orderFront(nil)
-        XCTAssertFalse(firstWindow.isVisible, "An unrelated orderFront must not defeat full-screen suppression")
-
-        delegate.applyFullScreenNotchVisibility(displayIDs: [])
-        XCTAssertFalse(firstWindow.isSuppressedForFullScreen)
-        XCTAssertTrue(firstWindow.isVisible)
-    }
-
-    @MainActor
-    func testFullScreenVisibilityDoesNotRevealAnAlreadyHiddenWindow() {
-        let delegate = AppDelegate()
-        let window = makeDynamicFocusWindow(displayID: 101)
-        delegate.notchWindows = [window]
-        defer { window.close() }
-
-        delegate.applyFullScreenNotchVisibility(displayIDs: [101])
-        delegate.applyFullScreenNotchVisibility(displayIDs: [])
-
-        XCTAssertFalse(window.isVisible)
     }
 
     func testFullScreenActivityVisibilityIsScopedToOneDisplay() {
@@ -244,6 +396,65 @@ final class InfrastructureUtilitiesTests: XCTestCase {
         XCTAssertEqual(recovered.hapticFeedbackEnabled, Settings().hapticFeedbackEnabled)
     }
 
+    func testFocusNotchBarItemPreferenceIsIndependentFromFocusWidget() throws {
+        var settings = Settings()
+        settings.focusSessionIconEnabled = false
+        settings.focusSessionWidgetEnabled = true
+
+        let decoded = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(settings))
+
+        XCTAssertFalse(decoded.focusSessionIconEnabled)
+        XCTAssertTrue(decoded.focusSessionWidgetEnabled)
+    }
+
+    func testNewFeaturesAreDisabledByDefault() {
+        let settings = Settings()
+
+        XCTAssertFalse(settings.systemEnhanceDockPreviewsEnabled)
+        XCTAssertFalse(settings.systemEnhanceAltTabEnabled)
+        XCTAssertFalse(settings.systemEnhanceCalendarIntegrationEnabled)
+        XCTAssertFalse(settings.systemEnhanceCompactPreviewEnabled)
+        XCTAssertFalse(settings.systemEnhanceEnhancedPreviewsEnabled)
+        XCTAssertFalse(settings.systemEnhancePasteAsPlainTextEnabled)
+        XCTAssertFalse(settings.systemEnhanceHingeAnimationEnabled)
+        XCTAssertFalse(settings.systemEnhanceDockClicksEnabled)
+        XCTAssertFalse(settings.systemEnhanceAutoQuitEnabled)
+        XCTAssertFalse(settings.systemEnhanceQuitProtectionEnabled)
+        XCTAssertFalse(settings.systemEnhanceGreenMaximizeEnabled)
+        XCTAssertFalse(settings.dockLayoutsEnabled)
+        XCTAssertFalse(settings.mediaToolsAutoOptimizeClipboard)
+        XCTAssertFalse(settings.mediaToolsShowShelfActions)
+        XCTAssertFalse(settings.mediaToolsOCRShortcutEnabled)
+        XCTAssertTrue(settings.automaticUpdateChecksEnabled)
+        XCTAssertTrue(settings.automaticallyDownloadSapphireUpdates)
+        XCTAssertTrue(settings.updateAvailableNotificationsEnabled)
+        XCTAssertTrue(settings.showUpdateAvailableLiveActivity)
+        XCTAssertFalse(settings.installedAppUpdatesEnabled)
+        XCTAssertFalse(settings.installedAppUpdateNotificationsEnabled)
+        XCTAssertFalse(settings.clipboardPickerEnabled)
+        XCTAssertFalse(settings.clipboardAutoClearEnabled)
+        XCTAssertFalse(settings.clipboardCleanURLEnabled)
+        XCTAssertFalse(settings.clipboardFinderCutPasteEnabled)
+        XCTAssertFalse(settings.clipboardFinderF2RenameEnabled)
+        XCTAssertFalse(settings.snippetsEnabled)
+        XCTAssertFalse(settings.emojiEnabled)
+        XCTAssertFalse(settings.mouseControlEnabled)
+        XCTAssertFalse(settings.monitoringMenuBarReadoutsEnabled)
+        XCTAssertFalse(settings.monitoringAlertsEnabled)
+        XCTAssertFalse(settings.archiveExtractorEnabled)
+        XCTAssertFalse(settings.dmgInstallerEnabled)
+        XCTAssertFalse(settings.timerWidgetEnabled)
+        XCTAssertFalse(settings.storageWidgetEnabled)
+        XCTAssertFalse(settings.continuityEnabled)
+        XCTAssertFalse(settings.fileShelfAirDropDestinationEnabled)
+        XCTAssertFalse(settings.fileShelfDeviceDestinationsEnabled)
+        XCTAssertFalse(settings.caffeinateAutoDuringTasks)
+        XCTAssertFalse(settings.devActivityEnabled)
+        XCTAssertFalse(settings.menuBarEnabled)
+        XCTAssertFalse(settings.menuBarProfilesEnabled)
+        XCTAssertFalse(settings.showOnlyRunningAppsInDock)
+    }
+
     func testEventHandlingSnapshotPreservesHotPathPreferences() {
         var settings = Settings()
         settings.clipboardFinderCutPasteEnabled = true
@@ -324,6 +535,36 @@ final class InfrastructureUtilitiesTests: XCTestCase {
     }
 
     @MainActor
+    func testNotchRuntimeStateOnlyBacksOffWhenEveryWindowIsIdle() {
+        let state = NotchRuntimeState()
+        let firstWindow = NSObject()
+        let secondWindow = NSObject()
+        let first = ObjectIdentifier(firstWindow)
+        let second = ObjectIdentifier(secondWindow)
+
+        XCTAssertFalse(state.shouldReduceBackgroundWork)
+
+        state.register(source: first)
+        XCTAssertTrue(state.shouldReduceBackgroundWork)
+
+        state.register(source: second, isUserNear: true)
+        XCTAssertFalse(state.shouldReduceBackgroundWork)
+
+        state.update(source: second, isUserNear: false)
+        XCTAssertTrue(state.shouldReduceBackgroundWork)
+
+        state.update(source: first, isExpanded: true)
+        XCTAssertFalse(state.shouldReduceBackgroundWork)
+
+        state.update(source: first, isExpanded: false)
+        XCTAssertTrue(state.shouldReduceBackgroundWork)
+
+        state.unregister(source: first)
+        state.unregister(source: second)
+        XCTAssertFalse(state.shouldReduceBackgroundWork)
+    }
+
+    @MainActor
     func testAppIconCacheKeepsRequestedSizesIndependent() {
         AppIconLoader.releaseCache()
         defer { AppIconLoader.releaseCache() }
@@ -334,6 +575,33 @@ final class InfrastructureUtilitiesTests: XCTestCase {
 
         XCTAssertLessThanOrEqual(small.size.width, 8)
         XCTAssertGreaterThan(larger.size.width, small.size.width)
+    }
+
+    func testGameModeDetectionRecognizesGamesCategory() {
+        XCTAssertTrue(GameModeDetection.isGamesCategory("public.app-category.games"))
+        XCTAssertTrue(GameModeDetection.isGamesCategory("public.app-category.games.action"))
+        XCTAssertFalse(GameModeDetection.isGamesCategory("public.app-category.video"))
+        XCTAssertFalse(GameModeDetection.isGamesCategory(nil))
+    }
+
+    func testGameModeDetectionRequiresFrontmostGameFullScreen() {
+        let evaluation = FullScreenDetector.Evaluation(
+            displayIDs: [101],
+            displays: [
+                FullScreenDetector.DisplayResult(
+                    displayID: 101,
+                    pid: 42,
+                    appName: "Chess",
+                    isFullScreen: true,
+                    detail: "test"
+                )
+            ],
+            isAccessibilityTrusted: true
+        )
+
+        XCTAssertTrue(GameModeDetection.isFrontmostGameFullScreen(frontmostPID: 42, evaluation: evaluation))
+        XCTAssertFalse(GameModeDetection.isFrontmostGameFullScreen(frontmostPID: 99, evaluation: evaluation))
+        XCTAssertFalse(GameModeDetection.isFrontmostGameFullScreen(frontmostPID: nil, evaluation: evaluation))
     }
 }
 

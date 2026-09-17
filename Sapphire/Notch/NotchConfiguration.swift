@@ -15,6 +15,28 @@ struct NotchConfiguration {
     private static let fallbackClosedNotchSize = (width: CGFloat(185), height: CGFloat(32))
     private static let externalMonitorNotchWidth: CGFloat = 150
 
+    static func hasHardwareNotch(on screen: NSScreen?) -> Bool {
+        guard let screen else { return false }
+        return hasHardwareNotch(
+            safeAreaTop: screen.safeAreaInsets.top,
+            leftArea: screen.auxiliaryTopLeftArea,
+            rightArea: screen.auxiliaryTopRightArea
+        )
+    }
+
+    static func hasHardwareNotch(
+        safeAreaTop: CGFloat,
+        leftArea: CGRect?,
+        rightArea: CGRect?
+    ) -> Bool {
+        guard safeAreaTop > 0,
+              let leftArea,
+              let rightArea else { return false }
+
+        let cutoutWidth = rightArea.minX - leftArea.maxX
+        return cutoutWidth.isFinite && cutoutWidth > 0
+    }
+
     // MARK: - Screen Size Adjustments
     static func screenWidthAdjustment(for screen: NSScreen?) -> CGFloat {
         let currentWidth = (screen ?? NSScreen.main)?.frame.size.width ?? designReferenceResolution.width
@@ -32,14 +54,6 @@ struct NotchConfiguration {
         return min(max(min(widthScale, heightScale), 0.85), 1.10)
     }
 
-    static var screenWidthAdjustment: CGFloat {
-        screenWidthAdjustment(for: NSScreen.main)
-    }
-
-    static var screenHeightAdjustment: CGFloat {
-        screenHeightAdjustment(for: NSScreen.main)
-    }
-
     // MARK: - Measured Notch Geometry
     private static var referenceScreen: NSScreen? {
         CursorPosition.visibleNotchWindows.first?.screen
@@ -54,7 +68,7 @@ struct NotchConfiguration {
         var width = fallbackClosedNotchSize.width
         var height = fallbackClosedNotchSize.height
 
-        if screen.safeAreaInsets.top > 0,
+        if hasHardwareNotch(on: screen),
            let leftArea = screen.auxiliaryTopLeftArea,
            let rightArea = screen.auxiliaryTopRightArea {
             let notchMinX = leftArea.maxX
@@ -89,10 +103,6 @@ struct NotchConfiguration {
 
     static var scaleFactor: CGFloat = 1.10
     static var hoverExpandedSize: CGSize { CGSize(width: universalWidth * scaleFactor, height: universalHeight * scaleFactor) }
-    static var hoverExpandedCornerRadius: CGFloat = 18 * screenWidthAdjustment
-
-    static var autoExpandedCornerRadius: CGFloat = 13 * screenWidthAdjustment
-    static var autoExpandedTallHeight: CGFloat = 80 * screenHeightAdjustment
 
     static var autoExpandedContentVerticalPadding: CGFloat = 8
 
@@ -132,8 +142,6 @@ struct NotchConfiguration {
     static var notchShadowBleed: CGFloat = 28
 
     // MARK: - Content Padding and Layout
-    static var contentTopPadding: CGFloat = 10 * screenHeightAdjustment
-    static var contentBottomPadding: CGFloat = 10 * screenHeightAdjustment
     static var contentHorizontalPadding: CGFloat = 35
     static var contentVisibilityThresholdHeight: CGFloat { universalHeight + 1 }
     static var primaryWidgetSwitchDelay: TimeInterval = 0.2
@@ -155,25 +163,8 @@ struct NotchConfiguration {
     static var activityContentHorizontalPadding: CGFloat = 15
     static var activityDefaultHorizontalPadding: CGFloat = 13
     static var activityWithContentHorizontalPadding: CGFloat = 15
-    static var activityContentBottomPadding: CGFloat = 10 * screenHeightAdjustment
-
-    // MARK: - Lyric View Configuration
-    static var lyricsFontSize: CGFloat = 10 * screenHeightAdjustment
-    static var lyricsMaxWidth: CGFloat = 200 * screenWidthAdjustment
-
-    // MARK: - Navigation Header Configuration
-    static var navHeaderLeadingPadding: CGFloat = 40 * screenWidthAdjustment
-    static var navHeaderTopPadding: CGFloat = 8 * screenHeightAdjustment
-    static var navHeaderTitleFontSize: CGFloat = 18 * screenHeightAdjustment
-    static var navHeaderTitleTopPadding: CGFloat = 10 * screenHeightAdjustment
-
-    // MARK: - Default Mode Icons Configuration
-    static var defaultModeIconsHorizontalPadding: CGFloat = 40 * screenWidthAdjustment
 
     // MARK: - Button Configuration
-    static var buttonDefaultIconSize: CGFloat = 14 * screenHeightAdjustment
-    static var buttonDefaultHorizontalPadding: CGFloat = 8 * screenWidthAdjustment
-    static var buttonDefaultVerticalPadding: CGFloat = 6 * screenHeightAdjustment
     static var buttonHoverAnimationDuration: TimeInterval = 0.15
     static var buttonHoverScaleFactor: CGFloat = 1.1
     static var buttonSpringAnimationResponse: Double = 0.4
@@ -212,9 +203,6 @@ struct NotchConfiguration {
     static var onboardingWindowWidth: CGFloat = 1200
     static var onboardingWindowHeight: CGFloat = 820
 
-    static var hostWindowMaxWidth: CGFloat = 1400 * screenWidthAdjustment
-    static var hostWindowMaxHeight: CGFloat = 720 * screenHeightAdjustment
-
     // MARK: - Menu Type Detection
     static func isLargeVerticalMenu(_ mode: NotchWidgetMode) -> Bool {
         switch mode {
@@ -235,6 +223,8 @@ struct ResolvedNotchConfiguration: Equatable {
     var initialSize: CGSize { CGSize(width: universalWidth, height: universalHeight) }
     let initialCornerRadius: CGFloat
     let topBuffer: CGFloat
+    let isFloatingIsland: Bool
+    let topInset: CGFloat
 
     // MARK: - Hover State
     let scaleFactor: CGFloat
@@ -286,11 +276,24 @@ struct ResolvedNotchConfiguration: Equatable {
     let contentBottomPadding: CGFloat
     let contentHorizontalPadding: CGFloat
 
+    // MARK: - Lyric View Configuration
+    let lyricsFontSize: CGFloat
+    let lyricsMaxWidth: CGFloat
+
+    // MARK: - Navigation Header Configuration
+    let navHeaderLeadingPadding: CGFloat
+    let navHeaderTopPadding: CGFloat
+    let navHeaderTitleFontSize: CGFloat
+    let navHeaderTitleTopPadding: CGFloat
+
+    // MARK: - Default Mode Icons Configuration
+    let defaultModeIconsHorizontalPadding: CGFloat
+
     // MARK: - Other static values
     let activityContentHorizontalPadding: CGFloat
     let activityDefaultHorizontalPadding: CGFloat
     let activityWithContentHorizontalPadding: CGFloat
-    let activityContentBottomPadding = NotchConfiguration.activityContentBottomPadding
+    let activityContentBottomPadding: CGFloat
     let contentUpdateDelay = NotchConfiguration.contentUpdateDelay
     let activityAnimationOutDelay = NotchConfiguration.activityAnimationOutDelay
     let autoContentRenderDelay = NotchConfiguration.autoContentRenderDelay
@@ -301,6 +304,9 @@ struct ResolvedNotchConfiguration: Equatable {
         let targetScreen = screen ?? CursorPosition.targetNotchScreen() ?? NSScreen.main
         let screenWidthAdj = NotchConfiguration.screenWidthAdjustment(for: targetScreen)
         let screenHeightAdj = NotchConfiguration.screenHeightAdjustment(for: targetScreen)
+        self.isFloatingIsland = settings.floatingIslandOnNotchlessDisplays
+            && !NotchConfiguration.hasHardwareNotch(on: targetScreen)
+        self.topInset = isFloatingIsland ? max(0, settings.floatingIslandTopOffset) : 0
 
         self.activityContentHorizontalPadding = 15 * screenHeightAdj
         self.activityDefaultHorizontalPadding = 13 * screenHeightAdj
@@ -330,6 +336,14 @@ struct ResolvedNotchConfiguration: Equatable {
             self.contentTopPadding = 10 * screenHeightAdj
             self.contentBottomPadding = 10 * screenHeightAdj
             self.contentHorizontalPadding = 35 * screenHeightAdj
+            self.activityContentBottomPadding = 10 * screenHeightAdj
+            self.lyricsFontSize = 10 * screenHeightAdj
+            self.lyricsMaxWidth = 200 * screenWidthAdj
+            self.navHeaderLeadingPadding = 40 * screenWidthAdj
+            self.navHeaderTopPadding = 8 * screenHeightAdj
+            self.navHeaderTitleFontSize = 18 * screenHeightAdj
+            self.navHeaderTitleTopPadding = 10 * screenHeightAdj
+            self.defaultModeIconsHorizontalPadding = 40 * screenWidthAdj
 
         let displayID = targetScreen?.displayIdentifier
         let resolvedWidth = settings.resolvedNotchWidth(forDisplayID: displayID)

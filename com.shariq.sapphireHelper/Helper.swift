@@ -192,7 +192,8 @@ class Helper: NSObject, HelperProtocol {
     private let firmwareHysteresis = 5
 
     private let dischargeWatchdogLock = NSLock()
-    private var dischargeWatchdogTimer: Timer?
+    private var dischargeWatchdogSource: CFRunLoopSource?
+    private var dischargeWatchdogFallbackTimer: Timer?
     private var dischargeWatchdogFloor: Int = 0
     private var dischargeWatchdogRechargeOnFloor: Bool = false
     private var dischargeWatchdogBypass: Bool = false
@@ -501,16 +502,38 @@ class Helper: NSObject, HelperProtocol {
 
     private func startDischargeWatchdog(safetyFloor: Int, rechargeOnFloor: Bool, bypassSafetyFloor: Bool) {
         dischargeWatchdogLock.lock()
-        defer { dischargeWatchdogLock.unlock() }
-
         dischargeWatchdogFloor = safetyFloor
         dischargeWatchdogRechargeOnFloor = rechargeOnFloor
         dischargeWatchdogBypass = bypassSafetyFloor
-        guard dischargeWatchdogTimer == nil else { return }
-
-        dischargeWatchdogTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            self?.checkDischargeWatchdog()
+        let isAlreadyMonitoring = dischargeWatchdogSource != nil || dischargeWatchdogFallbackTimer != nil
+        dischargeWatchdogLock.unlock()
+        guard !isAlreadyMonitoring else {
+            checkDischargeWatchdog()
+            return
         }
+
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        if let source = IOPSNotificationCreateRunLoopSource({ context in
+            guard let context else { return }
+            let helper = Unmanaged<Helper>.fromOpaque(context).takeUnretainedValue()
+            helper.checkDischargeWatchdog()
+        }, context)?.takeRetainedValue() {
+            dischargeWatchdogLock.withLock {
+                dischargeWatchdogSource = source
+            }
+            CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
+        } else {
+            logger.warning("[SapphireHelper] Power-source notifications unavailable; using the discharge watchdog timer fallback.")
+            let timer = Timer(timeInterval: 300, repeats: true) { [weak self] _ in
+                self?.checkDischargeWatchdog()
+            }
+            timer.tolerance = 30
+            dischargeWatchdogLock.withLock {
+                dischargeWatchdogFallbackTimer = timer
+            }
+            RunLoop.main.add(timer, forMode: .common)
+        }
+        checkDischargeWatchdog()
     }
 
     private func checkDischargeWatchdog() {
@@ -521,7 +544,7 @@ class Helper: NSObject, HelperProtocol {
             (dischargeWatchdogFloor, dischargeWatchdogRechargeOnFloor, dischargeWatchdogBypass)
         }
 
-        if !bypass && batteryPercent <= currentFloor {
+        if currentFloor > 0, !bypass, batteryPercent <= currentFloor {
             logger.log("[SapphireHelper] Discharge watchdog: battery at \(batteryPercent)% <= floor \(currentFloor)%, forcing discharge off.")
             _ = writeDischargeControlDirect(false)
 
@@ -535,12 +558,18 @@ class Helper: NSObject, HelperProtocol {
     }
 
     private func stopDischargeWatchdog() {
-        dischargeWatchdogLock.lock()
-        defer { dischargeWatchdogLock.unlock() }
-
-        dischargeWatchdogTimer?.invalidate()
-        dischargeWatchdogTimer = nil
-        dischargeWatchdogFloor = 0
+        let (source, timer) = dischargeWatchdogLock.withLock {
+            let source = dischargeWatchdogSource
+            let timer = dischargeWatchdogFallbackTimer
+            dischargeWatchdogSource = nil
+            dischargeWatchdogFallbackTimer = nil
+            dischargeWatchdogFloor = 0
+            return (source, timer)
+        }
+        if let source {
+            CFRunLoopSourceInvalidate(source)
+        }
+        timer?.invalidate()
     }
 
     func setDischarge(_ discharging: Bool, safetyFloor: Int, rechargeOnFloor: Bool, bypassSafetyFloor: Bool, reply: @escaping (Error?) -> Void) {
@@ -797,47 +826,17 @@ class Helper: NSObject, HelperProtocol {
             return
         }
 
-        let assessment = Process()
-        assessment.executableURL = URL(fileURLWithPath: "/usr/sbin/spctl")
-        assessment.arguments = ["--assess", "--type", "execute", "--verbose=2", stagingURL.path]
-        assessment.standardOutput = FileHandle.nullDevice
-        assessment.standardError = FileHandle.nullDevice
         do {
-            try assessment.run()
-            assessment.waitUntilExit()
+            _ = try fileManager.replaceItemAt(
+                currentURL,
+                withItemAt: stagingURL,
+                backupItemName: nil,
+                options: []
+            )
         } catch {
             try? fileManager.removeItem(at: stagingURL)
-            fail("Gatekeeper could not assess the staged update: \(error.localizedDescription)")
+            fail("The filesystem could not transactionally install the update: \(error.localizedDescription)")
             return
-        }
-        guard assessment.terminationStatus == 0 else {
-            try? fileManager.removeItem(at: stagingURL)
-            fail("Gatekeeper rejected the staged update.")
-            return
-        }
-
-        let swapResult = currentURL.path.withCString { currentPath in
-            stagingURL.path.withCString { stagingPath in
-                renameatx_np(
-                    AT_FDCWD,
-                    currentPath,
-                    AT_FDCWD,
-                    stagingPath,
-                    UInt32(RENAME_SWAP)
-                )
-            }
-        }
-        guard swapResult == 0 else {
-            let code = errno
-            try? fileManager.removeItem(at: stagingURL)
-            fail("The filesystem could not atomically install the update: \(String(cString: strerror(code))).")
-            return
-        }
-
-        do {
-            try fileManager.removeItem(at: stagingURL)
-        } catch {
-            logger.warning("[Helper] Installed update but could not remove previous hidden bundle at \(stagingURL.path): \(error.localizedDescription)")
         }
 
         logger.log("[Helper] installUpdate succeeded; new app is in place at \(currentAppPath)")
@@ -1574,7 +1573,7 @@ final class SleepBatteryMonitor {
     }
 
     private func readIntProperty(_ key: String) -> Int? {
-        let service = IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching("AppleSmartBattery"))
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
         defer { if service != 0 { IOObjectRelease(service) } }
         guard service != 0 else { return nil }
         guard let value = IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0) else { return nil }

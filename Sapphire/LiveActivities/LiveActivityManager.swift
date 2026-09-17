@@ -20,6 +20,134 @@ private struct SystemHUDIdentifier: Hashable {
     let style: HUDStyle
 }
 
+private struct WeatherLiveActivitySettings: Equatable {
+    let isEnabled: Bool
+    let isPersistent: Bool
+
+    init(_ settings: Settings) {
+        isEnabled = settings.weatherLiveActivityEnabled
+        isPersistent = settings.showPersistentWeatherLiveActivity
+    }
+}
+
+private struct LiveActivityEvaluationSettings: Equatable {
+    let hideLiveActivityInFullScreen: Bool
+    let hideActivitiesInFullScreen: [String: Bool]
+    let liveActivityOrder: [LiveActivityType]
+    let showUpdateAvailableLiveActivity: Bool
+    let devActivityEnabled: Bool
+    let devActivityHighPriority: Bool
+    let statsLiveActivityEnabled: Bool
+    let statsLiveActivityThresholdEnabled: Bool
+    let showPersistentStatsLiveActivity: Bool
+    let statThresholds: [StatType: StatThreshold]
+    let batteryLiveActivityEnabled: Bool
+    let showPersistentBatteryLiveActivity: Bool
+    let lowBatteryNotificationPercentage: Int
+    let lowBatteryNotificationSoundEnabled: Bool
+    let batteryNotificationStyle: BatteryNotificationStyle
+    let promptForLowPowerMode: Bool
+    let weatherLiveActivityEnabled: Bool
+    let showPersistentWeatherLiveActivity: Bool
+    let weatherLiveActivityInterval: Int
+    let musicLiveActivityEnabled: Bool
+    let continuityPhoneMediaLiveActivityEnabled: Bool
+    let enableQuickPeekOnHover: Bool
+    let showLyricsInLiveActivity: Bool
+    let spotifyShowNextSong: Bool
+    let spotifyShowNextSongAlbumArt: Bool
+    let calendarLiveActivityEnabled: Bool
+    let remindersLiveActivityEnabled: Bool
+    let timersLiveActivityEnabled: Bool
+    let focusSessionLiveActivityEnabled: Bool
+    let fileShelfLiveActivityEnabled: Bool
+    let eyeBreakLiveActivityEnabled: Bool
+    let desktopLiveActivityEnabled: Bool
+    let focusLiveActivityEnabled: Bool
+    let fileProgressLiveActivityEnabled: Bool
+    let microphoneLiveActivityEnabled: Bool
+    let otpLiveActivityEnabled: Bool
+    let parcelLiveActivityEnabled: Bool
+    let parcelTrackingEnabled: Bool
+    let bluetoothLiveActivityEnabled: Bool
+    let showBluetoothContinuityDevices: Bool
+    let continuityEnabled: Bool
+    let continuityStatusLiveActivityEnabled: Bool
+    let continuityNotifications: Bool
+    let continuityExternalLiveActivities: Bool
+    let sportsLiveActivityEnabled: Bool
+    let sportsCommentaryInLiveActivity: Bool
+    let sportsLiveActivityWhenLiveOnly: Bool
+    let sportsFavoriteTeams: [String]
+    let financeLiveActivityEnabled: Bool
+    let financeLiveActivityActiveHoursOnly: Bool
+    let financeFavoriteSymbols: [String]
+    let financeFavoriteSymbolIndex: Int
+    let enableVolumeHUD: Bool
+    let effectiveVolumeHUDStyle: HUDStyle
+    let enableBrightnessHUD: Bool
+    let effectiveBrightnessHUDStyle: HUDStyle
+
+    init(_ settings: Settings) {
+        hideLiveActivityInFullScreen = settings.hideLiveActivityInFullScreen
+        hideActivitiesInFullScreen = settings.hideActivitiesInFullScreen
+        liveActivityOrder = settings.liveActivityOrder
+        showUpdateAvailableLiveActivity = settings.showUpdateAvailableLiveActivity
+        devActivityEnabled = settings.devActivityEnabled
+        devActivityHighPriority = settings.devActivityHighPriority
+        statsLiveActivityEnabled = settings.statsLiveActivityEnabled
+        statsLiveActivityThresholdEnabled = settings.statsLiveActivityThresholdEnabled
+        showPersistentStatsLiveActivity = settings.showPersistentStatsLiveActivity
+        statThresholds = settings.statThresholds
+        batteryLiveActivityEnabled = settings.batteryLiveActivityEnabled
+        showPersistentBatteryLiveActivity = settings.showPersistentBatteryLiveActivity
+        lowBatteryNotificationPercentage = settings.lowBatteryNotificationPercentage
+        lowBatteryNotificationSoundEnabled = settings.lowBatteryNotificationSoundEnabled
+        batteryNotificationStyle = settings.batteryNotificationStyle
+        promptForLowPowerMode = settings.promptForLowPowerMode
+        weatherLiveActivityEnabled = settings.weatherLiveActivityEnabled
+        showPersistentWeatherLiveActivity = settings.showPersistentWeatherLiveActivity
+        weatherLiveActivityInterval = settings.weatherLiveActivityInterval
+        musicLiveActivityEnabled = settings.musicLiveActivityEnabled
+        continuityPhoneMediaLiveActivityEnabled = settings.continuityPhoneMediaLiveActivityEnabled
+        enableQuickPeekOnHover = settings.enableQuickPeekOnHover
+        showLyricsInLiveActivity = settings.showLyricsInLiveActivity
+        spotifyShowNextSong = settings.spotifyShowNextSong
+        spotifyShowNextSongAlbumArt = settings.spotifyShowNextSongAlbumArt
+        calendarLiveActivityEnabled = settings.calendarLiveActivityEnabled
+        remindersLiveActivityEnabled = settings.remindersLiveActivityEnabled
+        timersLiveActivityEnabled = settings.timersLiveActivityEnabled
+        focusSessionLiveActivityEnabled = settings.focusSessionLiveActivityEnabled
+        fileShelfLiveActivityEnabled = settings.fileShelfLiveActivityEnabled
+        eyeBreakLiveActivityEnabled = settings.eyeBreakLiveActivityEnabled
+        desktopLiveActivityEnabled = settings.desktopLiveActivityEnabled
+        focusLiveActivityEnabled = settings.focusLiveActivityEnabled
+        fileProgressLiveActivityEnabled = settings.fileProgressLiveActivityEnabled
+        microphoneLiveActivityEnabled = settings.microphoneLiveActivityEnabled
+        otpLiveActivityEnabled = settings.otpLiveActivityEnabled
+        parcelLiveActivityEnabled = settings.parcelLiveActivityEnabled
+        parcelTrackingEnabled = settings.parcelTrackingEnabled
+        bluetoothLiveActivityEnabled = settings.bluetoothLiveActivityEnabled
+        showBluetoothContinuityDevices = settings.showBluetoothContinuityDevices
+        continuityEnabled = settings.continuityEnabled
+        continuityStatusLiveActivityEnabled = settings.continuityStatusLiveActivityEnabled
+        continuityNotifications = settings.continuityNotifications
+        continuityExternalLiveActivities = settings.continuityExternalLiveActivities
+        sportsLiveActivityEnabled = settings.sportsLiveActivityEnabled
+        sportsCommentaryInLiveActivity = settings.sportsCommentaryInLiveActivity
+        sportsLiveActivityWhenLiveOnly = settings.sportsLiveActivityWhenLiveOnly
+        sportsFavoriteTeams = settings.sportsFavoriteTeams
+        financeLiveActivityEnabled = settings.financeLiveActivityEnabled
+        financeLiveActivityActiveHoursOnly = settings.financeLiveActivityActiveHoursOnly
+        financeFavoriteSymbols = settings.financeFavoriteSymbols
+        financeFavoriteSymbolIndex = settings.financeFavoriteSymbolIndex
+        enableVolumeHUD = settings.enableVolumeHUD
+        effectiveVolumeHUDStyle = settings.effectiveVolumeHUDStyle
+        enableBrightnessHUD = settings.enableBrightnessHUD
+        effectiveBrightnessHUDStyle = settings.effectiveBrightnessHUDStyle
+    }
+}
+
 enum FullScreenActivityVisibilityPolicy {
     static func shouldHide(
         activity: ActivityType,
@@ -87,6 +215,37 @@ class LiveActivityManager: ObservableObject {
         return NSScreen.screens.contains { effectiveActivity(on: $0) != .none }
     }
 
+    private var lastFullScreenGateDescription: String?
+
+    private func notchDisplaysAreFullScreen() -> Bool {
+        let fullScreenDisplays = activeAppMonitor.fullScreenDisplayIDs
+        guard !fullScreenDisplays.isEmpty else { return false }
+        let notchDisplays = notchDisplayIDs()
+        guard !notchDisplays.isEmpty else { return false }
+        return notchDisplays.isSubset(of: fullScreenDisplays)
+    }
+
+    private func notchDisplayIDs() -> Set<CGDirectDisplayID> {
+        let windows = (NSApp.delegate as? AppDelegate)?.notchWindows ?? []
+        return Set(windows.compactMap { ($0 as? DynamicFocusWindow)?.displayID }.filter { $0 != 0 })
+    }
+
+    private func isHiddenInFullScreen(_ activityType: ActivityType) -> Bool {
+        guard let liveActivitySettingsType = activityType.toLiveActivityType() else { return false }
+        return settingsModel.settings.hideActivitiesInFullScreen[liveActivitySettingsType.rawValue] == true
+    }
+
+    private func logFullScreenGateIfChanged(isFullScreen: Bool) {
+        let settings = settingsModel.settings
+        let hiddenTypes = settings.hideActivitiesInFullScreen.filter(\.value).keys.sorted().joined(separator: ",")
+        let fullScreen = activeAppMonitor.fullScreenDisplayIDs.sorted().map(String.init).joined(separator: ",")
+        let notch = notchDisplayIDs().sorted().map(String.init).joined(separator: ",")
+        let description = "notchFullScreen=\(isFullScreen) hideAll=\(settings.hideLiveActivityInFullScreen) hiddenTypes=[\(hiddenTypes)] fullScreenDisplays=[\(fullScreen)] notchDisplays=[\(notch)]"
+        guard description != lastFullScreenGateDescription else { return }
+        lastFullScreenGateDescription = description
+        logger.info("full-screen gate: \(description, privacy: .public)")
+    }
+
     private static let displayAnchoredActivityTypes: Set<ActivityType> = [.systemHUD]
 
     @Published private(set) var activityAnchorDisplayID: CGDirectDisplayID?
@@ -123,7 +282,6 @@ class LiveActivityManager: ObservableObject {
     private var lastIntervalWeatherShowTime: Date?
     private var lastWeatherLiveActivityEnabled: Bool?
     private var lastPersistentWeatherLiveActivityEnabled: Bool?
-    private var periodicCheckTimer: Timer?
     private var tickerRefreshTimer: Timer?
     private var tickerFetchTick = 0
     private var sportsFinanceWatchTimer: Timer?
@@ -210,7 +368,6 @@ class LiveActivityManager: ObservableObject {
         guard !hasStarted else { return }
         hasStarted = true
         setupSubscriptions()
-        setupPeriodicTimer()
         updateSportsFinanceWatchTimer()
         lastEvalTime = 0
         evaluateAndDisplayActivity()
@@ -226,8 +383,6 @@ class LiveActivityManager: ObservableObject {
         dismissalTimer = nil
         dismissGraceTimer?.invalidate()
         dismissGraceTimer = nil
-        periodicCheckTimer?.invalidate()
-        periodicCheckTimer = nil
         tickerRefreshTimer?.invalidate()
         tickerRefreshTimer = nil
         sportsFinanceWatchTimer?.invalidate()
@@ -369,12 +524,17 @@ class LiveActivityManager: ObservableObject {
     }
 
     private func subscribeToWeatherLiveActivitySettings() {
-        settingsModel.$settings
-            .receive(on: DispatchQueue.main)
+        let initialSettings = WeatherLiveActivitySettings(settingsModel.settings)
+        handleWeatherLiveActivitySettingsChanged(
+            isEnabled: initialSettings.isEnabled,
+            isPersistent: initialSettings.isPersistent
+        )
+
+        settingsModel.changes(of: WeatherLiveActivitySettings.init)
             .sink { [weak self] settings in
                 self?.handleWeatherLiveActivitySettingsChanged(
-                    isEnabled: settings.weatherLiveActivityEnabled,
-                    isPersistent: settings.showPersistentWeatherLiveActivity
+                    isEnabled: settings.isEnabled,
+                    isPersistent: settings.isPersistent
                 )
             }
             .store(in: &cancellables)
@@ -488,11 +648,11 @@ class LiveActivityManager: ObservableObject {
             NotificationCenter.default.publisher(for: NSNotification.Name("IOBluetoothHostControllerPoweredOnNotification")).mapToVoid(),
             NotificationCenter.default.publisher(for: NSNotification.Name("IOBluetoothHostControllerPoweredOffNotification")).mapToVoid(),
             eyeBreakManager.$isBreakTime.removeDuplicates().mapToVoid(),
+            eyeBreakManager.$isPausedForGameMode.removeDuplicates().mapToVoid(),
             timerManager.$isRunning.removeDuplicates().mapToVoid(),
             timerManager.$ringingTimers.removeDuplicates().mapToVoid(),
             FocusSessionManager.shared.$phase.removeDuplicates().mapToVoid(),
-            WeatherViewModel.shared.$weatherData
-                .removeDuplicates()
+            WeatherViewModel.shared.weatherDataPublisher
                 .mapToVoid(),
             musicWidget.$shouldShowLiveActivity.removeDuplicates().mapToVoid(),
             musicWidget.$isPlaying.removeDuplicates().mapToVoid(),
@@ -503,14 +663,15 @@ class LiveActivityManager: ObservableObject {
             musicWidget.$showQuickPeek.removeDuplicates().mapToVoid(),
             musicWidget.$isHoveringAlbumArt.removeDuplicates().mapToVoid(),
             musicWidget.$currentLyric.map(\.?.id).removeDuplicates().mapToVoid(),
-            settingsModel.$settings.removeDuplicates().mapToVoid(),
+            settingsModel.changes(of: LiveActivityEvaluationSettings.init).mapToVoid(),
             activeAppMonitor.$isLyricsAllowedForActiveApp
                 .removeDuplicates()
                 .mapToVoid(),
             activeAppMonitor.$fullScreenDisplayIDs.removeDuplicates().mapToVoid(),
             Publishers.CombineLatest(
                 activeAppMonitor.$activeAppBundleID,
-                settingsModel.$settings.map(\.hideLiveActivityWhenSourceActive)
+                settingsModel.changes(of: { $0.hideLiveActivityWhenSourceActive })
+                    .prepend(settingsModel.settings.hideLiveActivityWhenSourceActive)
             )
             .map { bundleID, hideWhenSourceActive in hideWhenSourceActive ? bundleID : nil }
             .removeDuplicates()
@@ -548,12 +709,10 @@ class LiveActivityManager: ObservableObject {
         .sink { [weak self] displayIDs in
             guard let self else { return }
             self.objectWillChange.send()
-            if !displayIDs.isEmpty {
-                let ids = displayIDs.sorted().map(String.init).joined(separator: ",")
-                self.logger.info("full-screen app on displayIDs=[\(ids)]; per-notch suppression decides visibility")
-            } else {
-                self.logger.info("full-screen app ended")
-            }
+            let ids = displayIDs.sorted().map(String.init).joined(separator: ",")
+            let notchDisplays = self.notchDisplayIDs()
+            let notchDisplaysFullScreen = !displayIDs.isEmpty && !notchDisplays.isEmpty && notchDisplays.isSubset(of: displayIDs)
+            self.logger.info("full-screen displays=[\(ids, privacy: .public)] notchDisplaysFullScreen=\(notchDisplaysFullScreen, privacy: .public)")
         }
         .store(in: &cancellables)
     }
@@ -575,13 +734,9 @@ class LiveActivityManager: ObservableObject {
     }
 
     private func subscribeToSportsFinanceSettings() {
-        let sportsEnabledPublisher = settingsModel.$settings
-            .map(\.sportsLiveActivityEnabled)
-            .removeDuplicates()
+        let sportsEnabledPublisher = settingsModel.changes(of: { $0.sportsLiveActivityEnabled })
 
-        let financeEnabledPublisher = settingsModel.$settings
-            .map(\.financeLiveActivityEnabled)
-            .removeDuplicates()
+        let financeEnabledPublisher = settingsModel.changes(of: { $0.financeLiveActivityEnabled })
 
         sportsEnabledPublisher
             .merge(with: financeEnabledPublisher)
@@ -790,6 +945,17 @@ class LiveActivityManager: ObservableObject {
         if self.currentActivity == .battery, let state = batteryMonitor.currentState, !state.isPluggedIn, self.dismissalTimer != nil {
             return
         }
+
+        let isFullScreen = notchDisplaysAreFullScreen()
+        logFullScreenGateIfChanged(isFullScreen: isFullScreen)
+        if isFullScreen && settingsModel.settings.hideLiveActivityInFullScreen {
+            consumeBlockedEphemeralActivities(winningType: nil)
+            if currentActivity != .none {
+                logger.info("full-screen: hiding \(self.currentActivity.rawValue, privacy: .public) (Hide All in Full Screen)")
+                setActivity(type: .none, content: .none)
+            }
+            return
+        }
         if !musicWidget.shouldShowLiveActivity {
             musicWidget.showQuickPeek = false
         }
@@ -817,6 +983,10 @@ class LiveActivityManager: ObservableObject {
             guard snoozedActivities[activityType] == nil else { continue }
             guard activityCheckers[activityType] != nil else { continue }
 
+            if isFullScreen && isHiddenInFullScreen(activityType) {
+                continue
+            }
+
             if let candidate = candidate(for: activityType) {
                 winningCandidate = candidate
                 break
@@ -830,12 +1000,6 @@ class LiveActivityManager: ObservableObject {
         }
 
         if winningCandidate == nil,
-           snoozedActivities[.continuityMedia] == nil,
-           let candidate = checkForContinuityMedia() {
-            winningCandidate = candidate
-        }
-
-        if winningCandidate == nil,
            snoozedActivities[.continuity] == nil,
            let candidate = checkForContinuity(issuesOnly: true) {
             winningCandidate = candidate
@@ -843,18 +1007,21 @@ class LiveActivityManager: ObservableObject {
 
         if winningCandidate == nil,
            !settingsModel.settings.devActivityHighPriority,
+           !(isFullScreen && isHiddenInFullScreen(.devActivity)),
            snoozedActivities[.devActivity] == nil,
            let candidate = checkForDevActivity() {
             winningCandidate = candidate
         }
 
         if winningCandidate == nil,
+           !(isFullScreen && isHiddenInFullScreen(.persistentStats)),
            snoozedActivities[.persistentStats] == nil,
            let candidate = checkForPersistentStats() {
             winningCandidate = candidate
         }
 
         if winningCandidate == nil,
+           !(isFullScreen && isHiddenInFullScreen(.persistentBattery)),
            snoozedActivities[.persistentBattery] == nil,
            let candidate = checkForPersistentBattery() {
             winningCandidate = candidate
@@ -867,6 +1034,7 @@ class LiveActivityManager: ObservableObject {
         }
 
         if winningCandidate == nil,
+           !(isFullScreen && isHiddenInFullScreen(.persistentWeather)),
            snoozedActivities[.persistentWeather] == nil,
            let candidate = checkForPersistentWeather() {
             winningCandidate = candidate
@@ -893,10 +1061,15 @@ class LiveActivityManager: ObservableObject {
         candidate: ((ActivityType) -> ActivityCandidate?)? = nil
     ) {
         let candidate = candidate ?? { [weak self] type in self?.activityCheckers[type]?() }
+        let isFullScreen = notchDisplaysAreFullScreen()
         for activityType in ephemeralActivityTypes {
             guard activityType != winningType else { continue }
             guard snoozedActivities[activityType] == nil else { continue }
             guard activityCheckers[activityType] != nil else { continue }
+
+            if isFullScreen && isHiddenInFullScreen(activityType) {
+                continue
+            }
 
             guard candidate(activityType) != nil else { continue }
             consumeEphemeralActivity(activityType)
@@ -1296,16 +1469,6 @@ class LiveActivityManager: ObservableObject {
                 dismissAfter)
     }
 
-    private func checkForContinuityMedia() -> (ActivityType, LiveActivityContent, TimeInterval?)? {
-        let bridge = ContinuityManager.shared.mediaBridge
-        guard bridge.shouldSurfacePhoneMedia, let media = bridge.phoneMedia else { return nil }
-        let device = bridge.phoneDeviceName ?? "Phone"
-        let id = "continuity-media-\(media.sessionId)-\(media.title)-\(media.artist ?? "")-\(media.isPlaying)"
-        return (.continuityMedia,
-                .standard(data: .continuityMedia(state: media, artwork: bridge.phoneArtwork, deviceName: device), id: id),
-                nil)
-    }
-
     private func checkForContinuityExternalActivity() -> (ActivityType, LiveActivityContent, TimeInterval?)? {
         guard settingsModel.settings.continuityEnabled,
               settingsModel.settings.continuityExternalLiveActivities else { return nil }
@@ -1369,6 +1532,11 @@ class LiveActivityManager: ObservableObject {
 
     private func checkForMusic() -> (ActivityType, LiveActivityContent, TimeInterval?)? {
         guard musicWidget.shouldShowLiveActivity, settingsModel.settings.musicLiveActivityEnabled else {
+            self.isDismissingPausedMusic = false
+            return nil
+        }
+        guard !musicWidget.isPhoneMediaSourceSelected
+                || settingsModel.settings.continuityPhoneMediaLiveActivityEnabled else {
             self.isDismissingPausedMusic = false
             return nil
         }
@@ -1665,7 +1833,10 @@ class LiveActivityManager: ObservableObject {
 
     private func checkForEyeBreak() -> (ActivityType, LiveActivityContent, TimeInterval?)? {
         if !eyeBreakManager.isBreakTime { hasShownCurrentEyeBreak = false }
-        guard settingsModel.settings.eyeBreakLiveActivityEnabled, eyeBreakManager.isBreakTime, !hasShownCurrentEyeBreak else {
+        guard settingsModel.settings.eyeBreakLiveActivityEnabled,
+              !eyeBreakManager.isPausedForGameMode,
+              eyeBreakManager.isBreakTime,
+              !hasShownCurrentEyeBreak else {
             return nil
         }
         return (
@@ -2054,6 +2225,54 @@ class LiveActivityManager: ObservableObject {
         evaluateAndDisplayActivity()
     }
 
+    func dismissCalendarNotification() {
+        guard currentActivity == .calendar || currentActivity == .reminder else { return }
+        if settingsModel.settings.hapticFeedbackEnabled { haptic() }
+
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.revertNotchWindowFocus()
+        }
+
+        handleActivityDismissal(for: currentActivity)
+        setActivity(type: .none, content: .none)
+        lastEvalTime = 0
+        evaluateAndDisplayActivity()
+    }
+
+    func snoozeCalendarNotification(
+        eventIDs: [String] = [],
+        reminderIDs: [String] = [],
+        for duration: TimeInterval = 5 * 60
+    ) {
+        guard currentActivity == .calendar || currentActivity == .reminder else { return }
+        if settingsModel.settings.hapticFeedbackEnabled { haptic() }
+
+        eventIDs.filter { !$0.isEmpty }.forEach {
+            notifiedEventMilestones[$0] = nil
+        }
+        reminderIDs.filter { !$0.isEmpty }.forEach {
+            notifiedReminderMilestones[$0] = nil
+        }
+
+        let activity = currentActivity
+        snoozedActivities[activity] = Date().addingTimeInterval(duration)
+
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.revertNotchWindowFocus()
+        }
+
+        setActivity(type: .none, content: .none)
+        lastEvalTime = 0
+        evaluateAndDisplayActivity()
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled, let self else { return }
+            self.lastEvalTime = 0
+            self.evaluateAndDisplayActivity()
+        }
+    }
+
     private func clearNotificationState() {
         if isNotificationHovered {
             isNotificationHovered = false
@@ -2139,33 +2358,16 @@ class LiveActivityManager: ObservableObject {
         }
     }
 
-    private func setupPeriodicTimer() {
-        periodicCheckTimer?.invalidate()
-        periodicCheckTimer = Timer.scheduledCoalescing(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                UpdateChecker.shared.checkInBackgroundIfNeeded()
-
-                let updateIsAvailable = self.settingsModel.settings.showUpdateAvailableLiveActivity
-                    && UpdateChecker.shared.status.isUpdateAvailable
-                let updateSnoozed = self.snoozedActivities[.updateAvailable] != nil
-                let shouldEvaluate = self.currentActivity == .none
-                    || (updateIsAvailable && self.currentActivity != .updateAvailable && !updateSnoozed)
-
-                if shouldEvaluate {
-                    self.lastEvalTime = 0
-                    self.evaluateAndDisplayActivity()
-                }
-            }
-        }
-    }
-
     private func updateTickerRefreshTimer() {
         let needsFastRefresh = currentActivity == .finance || currentActivity == .sports
         if needsFastRefresh {
             guard tickerRefreshTimer == nil else { return }
             tickerFetchTick = 0
-            tickerRefreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            tickerRefreshTimer = Timer.scheduledCoalescing(
+                withTimeInterval: 1.0,
+                repeats: true,
+                toleranceFraction: 0.1
+            ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     guard self.currentActivity == .finance || self.currentActivity == .sports else {
