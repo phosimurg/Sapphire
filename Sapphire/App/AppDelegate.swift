@@ -34,16 +34,9 @@ final class LockScreenState: ObservableObject {
 final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
     var displayID: CGDirectDisplayID = 0
     var isFocusable: Bool = false
-    private(set) var isSuppressedForFullScreen = false
-    private var wasVisibleBeforeFullScreenSuppression = false
 
     override var canBecomeKey: Bool { isFocusable }
     override var canBecomeMain: Bool { isFocusable }
-
-    override func orderFront(_ sender: Any?) {
-        guard !isSuppressedForFullScreen else { return }
-        super.orderFront(sender)
-    }
 
     override init(
         contentRect: NSRect,
@@ -77,25 +70,6 @@ final class DynamicFocusWindow: NSPanel, NSWindowDelegate {
 
     func setMouseEventHandlingEnabled(_ isEnabled: Bool = false) {
         ignoresMouseEvents = !isEnabled
-    }
-
-    func setFullScreenSuppressed(_ suppressed: Bool) {
-        guard isSuppressedForFullScreen != suppressed else { return }
-
-        if suppressed {
-            wasVisibleBeforeFullScreenSuppression = isVisible
-            isSuppressedForFullScreen = true
-            super.orderOut(nil)
-            return
-        }
-
-        isSuppressedForFullScreen = false
-        let shouldRestoreVisibility = wasVisibleBeforeFullScreenSuppression
-        wasVisibleBeforeFullScreenSuppression = false
-        if shouldRestoreVisibility {
-            super.orderFront(nil)
-            setMouseEventHandlingEnabled()
-        }
     }
 }
 
@@ -318,22 +292,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     private func observeSettings() {
-        Publishers.CombineLatest(
-            activeAppMonitor.$fullScreenDisplayIDs.removeDuplicates(),
-            settingsModel.$settings
-                .map(\.hideLiveActivityInFullScreen)
-                .removeDuplicates()
-        )
-        .receive(on: RunLoop.main)
-        .sink { [weak self] displayIDs, shouldHide in
-            let ids = displayIDs.sorted().map(String.init).joined(separator: ",")
-            appDelegateLog.info("Full-screen visibility update enabled=\(shouldHide) displayIDs=[\(ids)]")
-            self?.applyFullScreenNotchVisibility(
-                displayIDs: shouldHide ? displayIDs : []
-            )
-        }
-        .store(in: &cancellables)
-
         settingsModel.$settings
             .map(\.googleAnalyticsEnabled)
             .dropFirst()
@@ -509,7 +467,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         emojiShortcutManager.stopMonitoring()
         clipboardPickerManager.stopMonitoring()
         clipboardAutoClearManager.stop()
-        cleanURLManager.stopPolling()
+        cleanURLManager.stopMonitoring()
         finderCutPasteManager.removeTap()
         snippetManager.removeHandler()
         mouseControlManager.shutdown()
@@ -528,7 +486,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         liveActivityStartTask = nil
         liveActivityManager.stop()
         DevActivityMonitor.shared.stop()
-        LockScreenWallpaperManager.shared.restore()
+        LiveWallpaperManager.shared.shutdown()
 
         NotificationCenter.default.removeObserver(
             self,
@@ -703,6 +661,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         menuBarReadoutsManager.start()
         systemAlertsManager.start()
         DevActivityMonitor.shared.start()
+        LiveWallpaperManager.shared.start()
         _ = archiveExtractor
         _ = keyboardShortcutManager
         _ = plainTextPasteManager
@@ -757,7 +716,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     private func scheduleSubscriptionValidationTimer() {
         subscriptionValidationTimer?.invalidate()
-        subscriptionValidationTimer = Timer.scheduledCoalescing(withTimeInterval: 5 * 60 * 60, repeats: true) { [weak self] _ in
+        subscriptionValidationTimer = Timer.scheduledCoalescing(withTimeInterval: 5 * 60 * 60, repeats: true) { _ in
             Task { @MainActor in
                 print("[AppDelegate] Periodic subscription validation (5-hour interval).")
                 await SubscriptionManager.shared.validateSubscriptionStatus()
@@ -1002,14 +961,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             }
         }
 
+        LiveWallpaperManager.shared.screenDidLock()
+
         guard let mainScreen = NSScreen.main else { return }
         var widgetConfigs: [LockScreenManager.LockScreenWidgetConfig] = []
-
-        if settingsModel.settings.lockScreenCustomWallpaperEnabled {
-            LockScreenWallpaperManager.shared.applyCustomWallpaperIfEnabled(
-                path: settingsModel.settings.lockScreenCustomWallpaperPath
-            )
-        }
 
         if settingsModel.settings.lockScreenShowInfoWidget {
             widgetConfigs.append(.init(
@@ -1112,7 +1067,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     @objc private func screenIsUnlocked() {
-        LockScreenWallpaperManager.shared.restore()
+        LiveWallpaperManager.shared.screenDidUnlock()
 
         LockScreenMusicPaneController.shared.reset()
 
@@ -1260,6 +1215,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             let url = URL(string: urlString),
             url.scheme == "sapphire"
         else { return }
+        if url.host == "android-widgets" {
+            continuityManager.openWidgets()
+            return
+        }
         musicManager.spotifyOfficialAPI.handleRedirect(url: url)
         musicManager.tidalAPI.handleRedirect(url: url)
     }
@@ -1408,7 +1367,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             }) {
                 return [target]
             }
-            return []
+            let mainDisplayID = CGMainDisplayID()
+            return NSScreen.screens.filter { displayID(for: $0) == mainDisplayID }
         case .mainDisplay:
             let mainDisplayID = CGMainDisplayID()
             return NSScreen.screens.filter { displayID(for: $0) == mainDisplayID }
@@ -1421,7 +1381,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let screenFrame = screen.frame
         let initialConfig = ResolvedNotchConfiguration(from: settingsModel.settings, screen: screen)
         let paddedWidth = ceil(screenFrame.width)
-        let paddedHeight = ceil(max(initialConfig.initialSize.height + initialConfig.topBuffer + 24, screenFrame.height * 0.42))
+        let paddedHeight = ceil(max(initialConfig.initialSize.height + initialConfig.topInset + initialConfig.topBuffer + 24, screenFrame.height * 0.42))
         let targetRect = NSRect(
             x: screenFrame.minX,
             y: screenFrame.maxY - paddedHeight,
@@ -1445,7 +1405,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let screenFrame = screen.frame
         let initialConfig = ResolvedNotchConfiguration(from: settingsModel.settings, screen: screen)
         let paddedWidth = ceil(screenFrame.width)
-        let paddedHeight = ceil(max(initialConfig.initialSize.height + initialConfig.topBuffer + 24, screenFrame.height * 0.42))
+        let paddedHeight = ceil(max(initialConfig.initialSize.height + initialConfig.topInset + initialConfig.topBuffer + 24, screenFrame.height * 0.42))
         let rect = NSRect(
             x: screenFrame.minX,
             y: screenFrame.maxY - paddedHeight,
@@ -1471,7 +1431,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         if cgsSpace == nil { cgsSpace = CGSSpace() }
         cgsSpace?.windows.insert(window)
 
-        let controllerView = NotchController(notchWindow: window)
+        let controllerView = NotchController(notchWindow: window, timerManager: timerManager)
         let container = ZStack(alignment: .top) {
             controllerView
         }
@@ -1509,21 +1469,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         window.orderFront(nil)
 
         notchWindows.append(window)
-        applyFullScreenNotchVisibility(
-            displayIDs: settingsModel.settings.hideLiveActivityInFullScreen
-                ? activeAppMonitor.fullScreenDisplayIDs
-                : []
-        )
-    }
-
-    func applyFullScreenNotchVisibility(displayIDs: Set<CGDirectDisplayID>) {
-        for case let window as DynamicFocusWindow in notchWindows {
-            let shouldSuppress = window.displayID != 0 && displayIDs.contains(window.displayID)
-            guard window.isSuppressedForFullScreen != shouldSuppress else { continue }
-
-            window.setFullScreenSuppressed(shouldSuppress)
-            appDelegateLog.info("Notch window displayID=\(window.displayID) hidden=\(shouldSuppress)")
-        }
     }
 
     private func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
@@ -1564,7 +1509,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 previouslyFrontmostApp = currentFrontmost
             }
         }
-        window.setMouseEventHandlingEnabled(true)
         window.isFocusable = true
         if !NSApp.isActive { didActivateForNotchFocus = true }
         NSApp.activate(ignoringOtherApps: true)
@@ -1602,10 +1546,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
             let config = ResolvedNotchConfiguration(from: settingsModel.settings, screen: targetScreen)
             let baselineHeight = max(
-                config.initialSize.height + config.topBuffer + 24,
+                config.initialSize.height + config.topInset + config.topBuffer + 24,
                 targetScreen.frame.height * 0.42
             )
-            let desiredHeight = max(baselineHeight, requiredContentHeight + config.topBuffer + 36)
+            let desiredHeight = max(baselineHeight, requiredContentHeight + config.topInset + config.topBuffer + 36)
             let paddedHeight = min(ceil(desiredHeight), targetScreen.visibleFrame.height)
             var frame = window.frame
             let newY = targetScreen.frame.maxY - paddedHeight

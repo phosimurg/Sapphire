@@ -75,4 +75,42 @@ final class MusicWidgetVisibilityTests: XCTestCase {
         XCTAssertEqual(WidgetLayoutPolicy.capacityWidth(for: .music), 0)
         XCTAssertEqual(widgets, [.music, .weather, .sports])
     }
+
+    func testSpaceLimitCanBeBypassedForAnyWidget() {
+        let widgets = WidgetLayoutPolicy.fittingWidgets(
+            from: [.music, .weather, .calendar, .shortcuts, .agent],
+            availableWidth: 1,
+            showDividers: true,
+            bypassSpaceLimit: true
+        )
+
+        XCTAssertEqual(widgets, [.music, .weather, .calendar, .shortcuts])
+        XCTAssertTrue(WidgetLayoutPolicy.canFit(
+            .calendar,
+            in: [.music, .weather],
+            availableWidth: 1,
+            showDividers: true,
+            bypassSpaceLimit: true
+        ))
+    }
+
+    func testSpaceLimitBypassIsDisabledByDefault() {
+        XCTAssertFalse(Settings().bypassWidgetSpaceLimit)
+    }
+
+    func testPhoneMediaLiveActivityIsEnabledByDefault() {
+        XCTAssertTrue(Settings().continuityPhoneMediaLiveActivityEnabled)
+    }
+
+    func testAndroidMediaStateAcceptsMissingOptionalCapabilities() throws {
+        let data = Data(#"{"sessionId":"android-session","title":"Night Drive","isPlaying":true}"#.utf8)
+        let state = try JSONDecoder().decode(ContinuityMediaState.self, from: data)
+
+        XCTAssertEqual(state.sessionId, "android-session")
+        XCTAssertEqual(state.title, "Night Drive")
+        XCTAssertTrue(state.isPlaying)
+        XCTAssertEqual(state.positionMs, 0)
+        XCTAssertEqual(state.durationMs, 0)
+        XCTAssertFalse(state.canSeek)
+    }
 }
